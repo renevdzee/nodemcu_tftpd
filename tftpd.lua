@@ -21,7 +21,9 @@ s:on("receive",function(c,r)
       print(" done!")
       file.close()
     end
-    collectgarbage();
+    collectgarbage()
+  else
+    c:send("\0\5\0\4\0")
   end
 end) 
 s:listen(69)
