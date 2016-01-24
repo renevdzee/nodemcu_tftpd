@@ -21,7 +21,7 @@ file.remove("tftpd.lua")
   To run the tftp server:
   
 ```lua
-dofile("tftpd.lc")
+dofile("tftpd.lc")()
 ```
 
   To auto-start the tftp server add the line above to your init.lua
