@@ -20,6 +20,7 @@ s:on("receive",function(c,r)
     if(sz~=512)then
       print(" done!")
       file.close()
+      _tblk=0
     end
     collectgarbage()
   else
