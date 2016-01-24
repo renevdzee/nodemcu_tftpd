@@ -20,8 +20,11 @@ s:on("receive",function(c,r)
     if(sz~=512)then
       print(" done!")
       file.close()
+      _tblk=0
     end
-    collectgarbage();
+    collectgarbage()
+  else
+    c:send("\0\5\0\4\0")
   end
 end) 
 s:listen(69)
