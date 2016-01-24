@@ -29,7 +29,7 @@ return function(port)
             return
         end
         local r = ""
-        if(file.seek(set, (_tblk-1)*512)~=nil) then
+        if(file.seek("set", (_tblk-1)*512)~=nil) then
             r = file.read(512)
         end
         file.close()
