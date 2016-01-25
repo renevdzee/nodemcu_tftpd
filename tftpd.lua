@@ -19,6 +19,7 @@ return function(port)
         tmr.stop(_tmrid)
         _conn = nil
         _retry = 5
+        collectgarbage()  --gc when finished
     end
 
     local function sendack(c,n)
@@ -32,18 +33,22 @@ return function(port)
         local lsb = _tblk - msb*256
         local b=string.char(msb, lsb)
 
+        if(file.open(_fn,"r")==nil) then
+            c:send("\0\5\0\1\0") --Error: 1=file not found
+            reset()
+            return
+        end
         local r = ""
         if(file.seek("set", (_tblk-1)*512)~=nil) then
             r = file.read(512)
         end
+        file.close()
         if(r == nil) then
             r = ""
         end
         c:send("\0\3"..b..r)
         if(r:len() ~= 512) then
-            file.close()
-            print(" done!")
-            reset()
+            _lock=4 -- done, wait for ack
         end
     end
     
@@ -52,16 +57,15 @@ return function(port)
         _retry=_retry-1
         if(_retry~=0) then
             uart.write(0,"*")
-            if(_lock==1) then
-                sendblk(_conn)  --retransmit data
-            elseif(_lock==2) then
+            if(_lock==2) then
                 sendack(_conn, _tblk-1) --retransmit last ACK
+            else -- _lock is 1 or 4
+                sendblk(_conn)  --retransmit data
             end
             tmr.alarm(_tmrid, _tmrtimeout, 0, timeoutCB)
             return
         end
         print("Connection timed out")
-        file.close()
         if(_lock == 2) then
             file.remove(_fn) --remove incomplete file
         end
@@ -104,6 +108,7 @@ return function(port)
                 reset()
                 return
             end
+            file.close()
             sendblk(c)
         elseif(op==2) then
             --WRQ
@@ -114,6 +119,7 @@ return function(port)
                 reset()
                 return
             end
+            file.close()
             sendack(c,0)
         elseif(op==3) then
             --DATA received for a WRQ
@@ -121,6 +127,11 @@ return function(port)
                 return
             end
             local sz=r:len()-4
+            if(file.open(_fn,"a")==nil) then
+                c:send("\0\5\0\1\0") --Error: 1=file not found
+                reset()
+                return
+            end
             if(file.write(r:sub(5))==nil) then
                 c:send("\0\5\0\3\0") --Error: 3=no space left
                 reset()
@@ -130,27 +141,31 @@ return function(port)
             uart.write(0,"#")
             _tblk=_tblk+1
             if(sz~=512) then
-                file.close()
                 print(" done!")
                 reset()
-                return
             end
         elseif(op==4) then
             --ACK received for a RRQ
-            if(_lock~=1) then
+            if(_lock~=1 and _lock~=4) then
                 return
             end
             uart.write(0,"#")
             _tblk=_tblk+1
-            sendblk(c)
+            if(_lock==1) then
+                sendblk(c)
+            else
+                print(" done!")
+                reset()
+            end
         else
             --ERROR: 4=illegal op
             c:send("\0\5\0\4\0")
             return
         end
-        if (_lock) then alarmstart() end
-        collectgarbage()
-    end) 
+        if (_lock) then 
+            alarmstart()
+        end
+    end)
     s:listen(port)
     print("TFTP server running on port "..tostring(port))
     return s
